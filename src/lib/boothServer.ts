@@ -7,35 +7,33 @@ const DEFAULT_RELAY = 'https://localhost:8787'
 const configured = import.meta.env.VITE_BOOTH_SERVER_URL?.replace(/\/$/, '') || ''
 
 /**
- * Booth UI uses same-origin `/api/*` (Vite proxies to the relay).
- * That avoids a second self-signed cert warning for :8787 on the iPad.
- * Override with VITE_BOOTH_SERVER_URL or localStorage only when needed.
+ * Dev: same-origin `/api` via Vite proxy.
+ * Prod (Vercel): use VITE_BOOTH_SERVER_URL if set (public laptop relay).
+ * Empty string means “no laptop relay”.
  */
 export function getBoothServerUrl() {
+  if (configured) return configured
+
   if (typeof window !== 'undefined') {
     const fromStorage = localStorage.getItem(SERVER_KEY)?.replace(/\/$/, '') || ''
-    // Ignore stale localhost / old LAN IPs — same-origin proxy is the default
-    if (fromStorage && !fromStorage.includes('localhost') && !fromStorage.includes('127.0.0.1')) {
-      // Only honor an explicit override that isn't the page host's :8787
-      // (legacy direct-relay mode). Prefer proxy otherwise.
-      try {
-        const u = new URL(fromStorage)
-        if (u.port === '8787') {
-          return '' // use Vite /api proxy
-        }
-        return fromStorage
-      } catch {
-        return ''
-      }
+    if (fromStorage) return fromStorage
+
+    // Local Vite dev only — proxy /api → laptop relay
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return ''
     }
-    return '' // same-origin → https://<this-host>:5173/api/...
   }
-  return configured || DEFAULT_RELAY
+
+  return ''
 }
 
 export function setBoothServerUrl(url: string) {
   const normalized = url.trim().replace(/\/$/, '')
-  localStorage.setItem(SERVER_KEY, normalized.startsWith('http') ? normalized : `https://${normalized}`)
+  localStorage.setItem(
+    SERVER_KEY,
+    normalized.startsWith('http') ? normalized : `https://${normalized}`,
+  )
 }
 
 export function getPhotoDirectory() {
@@ -47,6 +45,10 @@ export function setPhotoDirectory(dir: string) {
 }
 
 export function isBoothServerConfigured() {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    if (host === 'localhost' || host === '127.0.0.1') return true
+  }
   return Boolean(getBoothServerUrl())
 }
 
@@ -74,6 +76,10 @@ export async function saveLaptopConfig(opts: {
 }): Promise<void> {
   setBoothServerUrl(opts.relayUrl)
   setPhotoDirectory(opts.outputDir)
+  const base = getBoothServerUrl()
+  if (!base && typeof window !== 'undefined') {
+    // same-origin proxy in local dev
+  }
   const res = await fetch(`${getBoothServerUrl()}/api/config`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -107,7 +113,7 @@ export async function sendFramesToLaptop(
     })
   } catch (err) {
     throw new Error(
-      `Could not reach laptop relay at ${url || '/api/booth'}. Is \`npm run dev:all\` running? (${
+      `Could not reach laptop relay at ${url || '/api/booth'}. Is \`npm run server\` running? (${
         err instanceof Error ? err.message : 'network error'
       })`,
     )
@@ -137,7 +143,7 @@ export async function fetchLaptopBooth(): Promise<BoothMeta | null> {
 }
 
 export async function pingBoothServer(url?: string): Promise<boolean> {
-  const base = (url || getBoothServerUrl()).replace(/\/$/, '')
+  const base = (url ?? getBoothServerUrl()).replace(/\/$/, '')
   const res = await fetch(`${base}/api/health`)
   return res.ok
 }

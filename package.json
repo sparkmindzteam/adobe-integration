@@ -16,7 +16,6 @@
     "concurrently": "^9.1.2",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "gifenc": "^1.0.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "selfsigned": "^2.4.1"

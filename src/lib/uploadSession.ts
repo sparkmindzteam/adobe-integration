@@ -1,14 +1,10 @@
-import { clearLaptopBooth, sendFramesToLaptop } from './boothServer'
+import { sendFramesToLaptop } from './boothServer'
 import { GIF_BUCKET, isSupabaseConfigured, supabase } from './supabase'
 
-export type PremiereHandoffResult = {
+export type SendPhotosResult = {
   sessionId: string
-}
-
-export type ExportResult = {
-  sessionId: string
-  gifPath: string
-  publicUrl: string
+  framePaths: string[]
+  laptopSaved: boolean
 }
 
 function requireClient() {
@@ -26,85 +22,49 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
   return res.blob()
 }
 
-/**
- * iPad → laptop relay for Premiere, and create/update the Supabase session row.
- */
-export async function sendFramesToPremiere(
-  frameDataUrls: string[],
-  gifBlob?: Blob | null,
-): Promise<PremiereHandoffResult> {
-  const result = await sendFramesToLaptop(frameDataUrls, gifBlob)
-
-  if (isSupabaseConfigured && supabase) {
-    const { error } = await supabase.from('booth_sessions').upsert({
-      id: result.sessionId,
-      frame_count: frameDataUrls.length,
-      status: 'premiere_pending',
-      gif_path: null,
-      gif_url: null,
-    })
-    if (error) {
-      console.warn('Supabase session upsert failed:', error.message)
-    }
-
-    // Upload the 5 frames for cloud backup (best-effort)
-    try {
-      await Promise.all(
-        frameDataUrls.map(async (dataUrl, i) => {
-          const blob = await dataUrlToBlob(dataUrl)
-          const path = `${result.sessionId}/frame_${String(i + 1).padStart(2, '0')}.jpg`
-          const { error: upErr } = await supabase!.storage
-            .from(GIF_BUCKET)
-            .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
-          if (upErr) console.warn('Frame upload failed:', path, upErr.message)
-        }),
-      )
-    } catch (err) {
-      console.warn('Frame backup skipped:', err)
-    }
-  }
-
-  return result
+function newSessionId() {
+  return crypto.randomUUID()
 }
 
 /**
- * Upload GIF to Supabase Storage + booth_sessions, then clear laptop inbox.
+ * Upload the 5 photos to Supabase Storage (required).
+ * Also tries the laptop Premiere inbox when a relay is reachable.
  */
-export async function exportGifToSupabase(
-  sessionId: string,
-  gifBlob: Blob,
-): Promise<ExportResult> {
+export async function sendPhotosToStorage(
+  frameDataUrls: string[],
+): Promise<SendPhotosResult> {
   const client = requireClient()
-  const gifPath = `${sessionId}/booth.gif`
 
-  const { error: gifError } = await client.storage
-    .from(GIF_BUCKET)
-    .upload(gifPath, gifBlob, {
-      contentType: 'image/gif',
-      upsert: true,
-    })
+  let sessionId = newSessionId()
+  let laptopSaved = false
 
-  if (gifError) throw gifError
+  try {
+    const laptop = await sendFramesToLaptop(frameDataUrls, null)
+    sessionId = laptop.sessionId
+    laptopSaved = true
+  } catch (err) {
+    console.warn('Laptop relay skipped:', err)
+  }
 
-  const {
-    data: { publicUrl },
-  } = client.storage.from(GIF_BUCKET).getPublicUrl(gifPath)
+  const framePaths: string[] = []
+  for (let i = 0; i < frameDataUrls.length; i++) {
+    const blob = await dataUrlToBlob(frameDataUrls[i])
+    const path = `${sessionId}/frame_${String(i + 1).padStart(2, '0')}.jpg`
+    const { error } = await client.storage
+      .from(GIF_BUCKET)
+      .upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+    if (error) throw error
+    framePaths.push(path)
+  }
 
   const { error: rowError } = await client.from('booth_sessions').upsert({
     id: sessionId,
-    gif_path: gifPath,
-    gif_url: publicUrl,
-    frame_count: 5,
-    status: 'exported',
+    frame_count: frameDataUrls.length,
+    status: laptopSaved ? 'uploaded' : 'cloud_only',
+    gif_path: null,
+    gif_url: null,
   })
-
   if (rowError) throw rowError
 
-  try {
-    await clearLaptopBooth()
-  } catch (err) {
-    console.warn('Laptop inbox clear failed after Supabase export:', err)
-  }
-
-  return { sessionId, gifPath, publicUrl }
+  return { sessionId, framePaths, laptopSaved }
 }

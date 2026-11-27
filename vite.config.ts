@@ -36,20 +36,23 @@ function loadHttps() {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  server: {
-    host: true,
-    port: 5173,
-    https: loadHttps(),
-    // iPad only talks to :5173 — Vite forwards /api to the laptop relay
-    // so we don't need a second trusted cert for :8787
-    proxy: {
-      '/api': {
-        target: 'https://127.0.0.1:8787',
-        changeOrigin: true,
-        secure: false,
-      },
-    },
-  },
-})
+  // HTTPS + laptop proxy only for local `vite` / `vite preview`, not Vercel build
+  ...(command === 'serve'
+    ? {
+        server: {
+          host: true,
+          port: 5173,
+          https: loadHttps(),
+          proxy: {
+            '/api': {
+              target: 'https://127.0.0.1:8787',
+              changeOrigin: true,
+              secure: false,
+            },
+          },
+        },
+      }
+    : {}),
+}))
