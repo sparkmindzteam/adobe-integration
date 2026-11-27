@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>FrameFlash Booth</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>FrameFlash</h1>
+        <p>Laptop side: auto-checks for new 5-photo batches from the iPad.</p>
+      </header>
+
+      <section class="card">
+        <label for="relayUrl">Laptop relay URL</label>
+        <input id="relayUrl" type="text" placeholder="https://127.0.0.1:8787" />
+
+        <label for="supabaseUrl">Supabase URL (optional)</label>
+        <input id="supabaseUrl" type="text" placeholder="https://xxxx.supabase.co" />
+
+        <label for="supabaseKey">Anon key (optional)</label>
+        <input id="supabaseKey" type="password" placeholder="eyJ..." />
+
+        <button id="saveConfig" type="button">Save</button>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <h2>Current inbox</h2>
+          <button id="refresh" type="button" class="ghost">Fetch now</button>
+        </div>
+        <div id="boothCard" class="booth-card">
+          <p class="muted">Waiting for iPad…</p>
+        </div>
+        <button id="importBatch" type="button" disabled>Import new 5 photos into Premiere</button>
+        <button id="clearBatch" type="button" class="ghost">Clear inbox</button>
+        <p id="status" class="status">Polling every 3s for new photos.</p>
+      </section>
+    </main>
+    <script src="index.js"></script>
+  </body>
+</html>
