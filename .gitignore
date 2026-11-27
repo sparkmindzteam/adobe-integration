@@ -31,3 +31,4 @@ test photos/
 *.pem
 server/booth-meta.json
 
+.vercel

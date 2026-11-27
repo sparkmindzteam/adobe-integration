@@ -2,7 +2,6 @@ const SERVER_KEY = 'frameflash-booth-server'
 const DIR_KEY = 'frameflash-photo-dir'
 
 export const DEFAULT_PHOTO_DIR = 'E:\\Adobe integration\\test photos'
-const DEFAULT_RELAY = 'https://localhost:8787'
 
 const configured = import.meta.env.VITE_BOOTH_SERVER_URL?.replace(/\/$/, '') || ''
 

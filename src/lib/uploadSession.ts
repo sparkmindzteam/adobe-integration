@@ -35,12 +35,12 @@ export async function sendPhotosToStorage(
 ): Promise<SendPhotosResult> {
   const client = requireClient()
 
-  let sessionId = newSessionId()
+  let sessionId: string = newSessionId()
   let laptopSaved = false
 
   try {
     const laptop = await sendFramesToLaptop(frameDataUrls, null)
-    sessionId = laptop.sessionId
+    sessionId = String(laptop.sessionId)
     laptopSaved = true
   } catch (err) {
     console.warn('Laptop relay skipped:', err)
