@@ -1,7 +1,6 @@
 {
-  "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "echo Using committed dist",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
+  "installCommand": "echo skip",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
